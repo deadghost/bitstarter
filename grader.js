@@ -21,12 +21,18 @@ References:
    - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
 */
 
+// Dependencies and Defaults
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var sys = require('util');
+//var http = require('http');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "http://nameless-spire-5878.herokuapp.com/";
 
+// Check file exists
 var assertFileExists = function(infile) {
     var instr = infile.toString();
     if(!fs.existsSync(instr)) {
@@ -36,17 +42,20 @@ var assertFileExists = function(infile) {
     return instr;
 };
 
+// Load html into cheerio
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
 };
 
+// Parse checksfile string as JSON and return parsed value
 var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
+// Check if tag is present in html
 var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
-    var checks = loadChecks(checksfile).sort();
+    $ = cheerioHtmlFile(htmlfile); // load html into $
+    var checks = loadChecks(checksfile).sort(); // sort json checks file
     var out = {};
     for(var ii in checks) {
         var present = $(checks[ii]).length > 0;
@@ -61,12 +70,28 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+function checkUrl(url) {
+    rest.get(url).on('complete', function(result) {
+	if (result instanceof Error) {
+	    console.log("%s does not exist. Exiting.", instr);
+	    process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
+	} else {
+	    sys.puts(result);
+	}
+    });
+};
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('-u, --url <url>', 'File url', clone(checkUrl), URL_DEFAULT)
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
+    if (program.url) {
+	var checkJson = checkHtmlFile(program.url, program.checks);
+    } else {
+	var checkJson = checkHtmlFile(program.file, program.checks);
+    }
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
 } else {
